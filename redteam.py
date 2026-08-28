@@ -201,7 +201,7 @@ def run_taxonomy():
     for c in forbidden:
         print(f"      \u00b7 {lang.cause_name(c)}")
     print(f"\n    playbooks that contradict themselves:    "
-          f"{len(bad) if bad else '0  \u2713'}")
+          f"{len(bad) if bad else '0  ' + chr(10003)}"
     for b in bad:
         print(f"      \u2717 {b}")
     return (1 if not bad else 0), 1
