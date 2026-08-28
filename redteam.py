@@ -179,7 +179,7 @@ def run_confidence():
     print(f"    the ceiling any model output is capped to  {LLM_CONFIDENCE_CEILING:.2f}")
     ok = LLM_CONFIDENCE_CEILING < 0.97
     print(f"\n    model can outrank a rule?              "
-          f"{'NO ✓' if ok else 'YES - BUG ✗'}")
+          result = f"{'NO ' + chr(10003) if ok else 'YES - BUG ' + chr(10007)}"
     print("      A model claiming 0.99 gets clamped. Certainty has to be earned")
     print("      by evidence, not asserted by the thing being evaluated.")
     return (1 if ok else 0), 1
