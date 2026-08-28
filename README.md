@@ -1,6 +1,6 @@
 # Recoup
 
-[![verify](https://github.com/ChethanM27/recoup/actions/workflows/verify.yml/badge.svg)](https://github.com/USERNAME/recoup/actions/workflows/verify.yml)
+[![verify](https://github.com/ChethanM27/recoup/actions/workflows/verify.yml/badge.svg)](https://github.com/ChethanM27/recoup/actions/workflows/verify.yml)
 
 **A revenue recovery control tower.**
 Razorpay AI Buildathon · Track 03 — AI Revenue Recovery
