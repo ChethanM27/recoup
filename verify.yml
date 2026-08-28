@@ -1,0 +1,74 @@
+# Every claim in the README is backed by a script in this repo. This workflow
+# runs all of them on every push, so the badge is the claim.
+
+name: verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Confirm zero dependencies
+        run: |
+          echo "This project imports nothing outside the standard library."
+          ! test -f requirements.txt || (echo "unexpected requirements.txt" && exit 1)
+          python -c "import recoup, recoup.engine, recoup.policy, recoup.taxonomy"
+
+      - name: Batch runs and reports a number
+        run: python run_sim.py --n 400
+
+      - name: Classifier scores against ground truth
+        run: python evaluate.py --n 900
+
+      - name: LLM cage refuses every attack
+        run: python redteam.py
+
+      - name: Guardrails hold when beliefs are wrong
+        run: python stress.py --n 350
+
+      - name: Learner recovers from inverted priors
+        run: python learn.py --world inverted --rounds 20
+
+      - name: Survives the gateway dying mid-batch
+        run: python demo_failure.py
+
+      - name: Dashboard serves and every endpoint answers
+        run: |
+          python serve.py --n 250 --port 8000 &
+          for i in $(seq 1 40); do
+            curl -sf http://localhost:8000/api/summary >/dev/null && break
+            sleep 2
+          done
+          for ep in summary trust cage showcase decisions; do
+            curl -sf "http://localhost:8000/api/$ep" >/dev/null \
+              && echo "  /api/$ep ok" \
+              || (echo "  /api/$ep FAILED" && exit 1)
+          done
+          curl -sf http://localhost:8000/ | grep -q "Recoup" && echo "  dashboard ok"
+
+      - name: No secrets committed
+        run: |
+          if grep -rniE "rzp_(test|live)_[a-z0-9]{10,}" . \
+               --exclude-dir=.git --exclude=.env.example --exclude=verify.yml; then
+            echo "A Razorpay key literal is present in the repo."
+            exit 1
+          fi
+          test ! -f .env || (echo ".env must never be committed" && exit 1)
+          echo "  clean"

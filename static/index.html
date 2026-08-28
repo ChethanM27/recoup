@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recoup — revenue recovery control tower</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#080B14;
+  --gold:#F5B841; --mint:#4ADE9B; --coral:#FF6F5E; --violet:#9A8CFF;
+  --fg:#F2F6FB; --fg2:rgba(242,246,251,.68); --fg3:rgba(242,246,251,.40);
+  --line:rgba(255,255,255,.09); --line2:rgba(255,255,255,.055);
+  --glass:rgba(255,255,255,.035);
+  --exp:cubic-bezier(.16,1,.3,1);
+  --spring:cubic-bezier(.34,1.4,.5,1);
+  --r:20px;
+}
+*{box-sizing:border-box;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font-family:'Instrument Sans',system-ui,sans-serif;
+  font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+
+/* ═══ AMBIENT LAYER 1 — three aurora blobs, each on its own clock ═══ */
+.aurora{position:fixed;inset:-30%;z-index:0;pointer-events:none;contain:layout style paint;will-change:transform}
+.aurora i{position:absolute;display:block;border-radius:50%;will-change:transform;opacity:.8}
+.a1{width:46vw;height:46vw;left:5%;top:0%;background:rgba(154,140,255,.30);
+  animation:fl1 21s ease-in-out infinite alternate}
+.a2{width:52vw;height:52vw;right:0%;top:12%;background:rgba(74,222,155,.16);
+  animation:fl2 27s ease-in-out infinite alternate}
+.a3{width:44vw;height:44vw;left:32%;bottom:-8%;background:rgba(245,184,65,.22);
+  animation:fl3 24s ease-in-out infinite alternate}
+@keyframes fl1{0%{transform:translate3d(0,0,0) scale(1)}100%{transform:translate3d(16%,12%,0) scale(1.22)}}
+@keyframes fl2{0%{transform:translate3d(0,0,0) scale(1.1)}100%{transform:translate3d(-14%,18%,0) scale(.9)}}
+@keyframes fl3{0%{transform:translate3d(0,0,0) scale(.95)}100%{transform:translate3d(12%,-14%,0) scale(1.18)}}
+
+/* ═══ AMBIENT LAYER 2 — film grain ═══ */
+.grain{position:fixed;inset:-150%;z-index:3;pointer-events:none;opacity:.05;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation:grain 1s steps(5) infinite}
+@keyframes grain{0%{transform:translate(0,0)}20%{transform:translate(-4%,3%)}
+  40%{transform:translate(3%,-4%)}60%{transform:translate(-3%,-3%)}
+  80%{transform:translate(4%,3%)}100%{transform:translate(0,0)}}
+
+.wrap{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:40px 28px 120px}
+h1,h2,h3{font-family:'Bricolage Grotesque',sans-serif;margin:0;font-weight:700;
+  letter-spacing:-.025em;line-height:1.08}
+.tag{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--fg3)}
+.num{font-variant-numeric:tabular-nums;letter-spacing:-.03em}
+
+.rv{opacity:0;transform:translateY(26px)}
+.rv.in{opacity:1;transform:none;transition:opacity .9s var(--exp),transform .9s var(--exp)}
+
+/* ═══ AMBIENT LAYER 3 — glass cards: sweeping sheen + cursor spotlight ═══ */
+.card{position:relative;overflow:hidden;border-radius:var(--r);border:1px solid var(--line);
+  background:linear-gradient(160deg,rgba(255,255,255,.055),rgba(255,255,255,.018));
+  backdrop-filter:blur(18px) saturate(140%);-webkit-backdrop-filter:blur(18px) saturate(140%);
+  box-shadow:0 1px 0 rgba(255,255,255,.07) inset,0 22px 50px -26px rgba(0,0,0,.85)}
+.card>*{position:relative;z-index:1}
+
+/* ═══ masthead ═══ */
+header{display:flex;justify-content:space-between;align-items:center;gap:26px;
+  margin-bottom:34px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:13px}
+.dot{width:34px;height:34px;border-radius:11px;position:relative;flex:none;
+  background:conic-gradient(from 140deg,var(--gold),var(--coral),var(--violet),var(--mint),var(--gold));
+  animation:spin 9s linear infinite}
+.dot::after{content:"";position:absolute;inset:3px;border-radius:8px;background:var(--bg)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.wordmark{font-family:'Bricolage Grotesque',sans-serif;font-size:23px;font-weight:800;letter-spacing:-.035em}
+.wordmark span{color:var(--fg3);font-weight:600}
+.pills{display:flex;gap:8px;flex-wrap:wrap}
+.pill{border:1px solid var(--line);border-radius:999px;padding:6px 14px;background:var(--glass);
+  font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--fg2);white-space:nowrap}
+.pill b{color:var(--fg);font-weight:500}
+.pill.live{border-color:rgba(74,222,155,.4);color:var(--mint)}
+.pill.live i{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--mint);
+  margin-right:8px;animation:beat 1.9s ease-in-out infinite}
+@keyframes beat{0%,100%{transform:scale(1);opacity:1}
+  70%{transform:scale(1.4);opacity:.4}}
+
+/* ═══ AMBIENT LAYER 4 — the wire, always scrolling, always real data ═══ */
+.ticker{margin:0 0 34px;padding:11px 0;border-top:1px solid var(--line2);
+  border-bottom:1px solid var(--line2);overflow:hidden;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 7%,#000 93%,transparent);
+  mask-image:linear-gradient(90deg,transparent,#000 7%,#000 93%,transparent)}
+.tk-track{display:flex;gap:10px;width:max-content;animation:march 64s linear infinite}
+.ticker:hover .tk-track{animation-play-state:paused}
+@keyframes march{to{transform:translateX(-50%)}}
+.tk{display:flex;align-items:center;gap:9px;padding:6px 14px;border-radius:99px;
+  background:var(--glass);border:1px solid var(--line2);white-space:nowrap;font-size:12.5px}
+.tk b{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;color:var(--gold);letter-spacing:-.02em}
+.tk s{width:6px;height:6px;border-radius:50%;flex:none;text-decoration:none}
+.tk s.win{background:var(--mint);box-shadow:0 0 9px var(--mint)}
+.tk s.loss{background:var(--coral)}
+.tk s.neutral{background:rgba(255,255,255,.3)}
+.tk em{font-style:normal;color:var(--fg3)}
+
+/* ═══ hero ═══ */
+.hero{margin-bottom:26px}
+.kicker{margin-bottom:20px}
+.headline{font-family:'Bricolage Grotesque',sans-serif;font-size:clamp(40px,6.6vw,76px);
+  font-weight:800;letter-spacing:-.03em;line-height:1.08;max-width:15ch;margin:0 0 26px}
+/* AMBIENT LAYER 5 — the money figure shimmers and breathes, forever */
+.headline .g{background:linear-gradient(100deg,#E9A72F 22%,#FFF4D2 40%,#F5B841 54%,#E9A72F 72%);
+  background-size:280% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;
+  animation:shine 6.5s linear infinite,glowPulse 4.5s ease-in-out infinite}
+@keyframes shine{from{background-position:200% 0}to{background-position:-180% 0}}
+@keyframes glowPulse{0%,100%{opacity:1}50%{opacity:1}}
+.headline .s{display:block;font-size:.44em;font-weight:600;color:var(--fg2);
+  letter-spacing:-.01em;margin-top:20px;max-width:24ch;line-height:1.42}
+
+.flowcard{padding:26px 26px 0;margin-bottom:18px}
+#flow{width:100%;height:auto;display:block}
+.legend{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:6px 0 26px}
+.leg{padding:18px 20px;border-radius:15px;background:var(--glass);border:1px solid var(--line2);
+  transition:transform .5s var(--exp),border-color .3s}
+.leg:hover{transform:translateY(-3px);border-color:var(--line)}
+.leg .sw{display:block;width:26px;height:4px;border-radius:99px;margin-bottom:13px}
+.leg .lv{font-family:'Bricolage Grotesque',sans-serif;font-size:29px;font-weight:700;letter-spacing:-.035em}
+.leg .lk{font-size:13px;font-weight:500;margin-top:2px}
+.leg .ln{font-size:12.5px;color:var(--fg3);margin-top:9px;line-height:1.5}
+.k-ours .lv{color:var(--gold)}
+.k-ours .sw{background:var(--gold);box-shadow:0 0 16px rgba(245,184,65,.6);
+  animation:swGlow 3.4s ease-in-out infinite}
+@keyframes swGlow{50%{opacity:1}}
+.k-organic .lv{color:var(--fg2)} .k-organic .sw{background:rgba(255,255,255,.4)}
+.k-lost .lv{color:var(--coral)} .k-lost .sw{background:var(--coral)}
+
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:96px}
+.stat{position:relative;overflow:hidden;padding:20px;border-radius:16px;background:var(--glass);
+  border:1px solid var(--line2);transition:transform .5s var(--exp),border-color .3s}
+.stat:hover{transform:translateY(-4px);border-color:var(--line)}
+/* simplified underline animation */
+.stat::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;
+  background:var(--gold);opacity:0;animation:travel 5s linear infinite}
+.stat:nth-child(2)::after{animation-delay:1s}
+.stat:nth-child(3)::after{animation-delay:2s}
+.stat:nth-child(4)::after{animation-delay:3s}
+.stat:nth-child(5)::after{animation-delay:4s}
+@keyframes travel{0%{opacity:0;transform:translateX(-100%)}50%{opacity:.75}100%{opacity:0;transform:translateX(100%)}}
+.stat .sv{font-family:'Bricolage Grotesque',sans-serif;font-size:27px;font-weight:700;letter-spacing:-.035em}
+.stat .sk{font-size:12px;color:var(--fg3);margin-top:4px;line-height:1.35}
+
+.sec{margin-bottom:96px}
+.shead{margin-bottom:26px}
+.shead h2{font-size:clamp(28px,3.6vw,40px)}
+.shead p{margin:12px 0 0;color:var(--fg2);font-size:15.5px;max-width:60ch}
+
+/* ═══ theatre — AMBIENT LAYER 7: it breathes ═══ */
+.theatre{animation:breathe 6s ease-in-out infinite;contain:layout style paint}
+@keyframes breathe{
+  0%,100%{opacity:.94;transform:scale(1)}
+  50%{opacity:1;transform:scale(1.003)}}
+.scenes{display:flex;gap:9px;padding:20px 22px;overflow-x:auto;
+  border-bottom:1px solid var(--line2);scrollbar-width:none}
+.scenes::-webkit-scrollbar{display:none}
+.scene{flex:none;border:1px solid var(--line);background:var(--glass);border-radius:14px;
+  padding:12px 16px;cursor:pointer;text-align:left;color:var(--fg2);font-family:inherit;
+  font-size:12.5px;line-height:1.4;max-width:210px;
+  transition:transform .45s var(--spring),border-color .3s,background .3s,color .3s}
+.scene:hover{transform:translateY(-3px);color:var(--fg)}
+.scene.on{background:rgba(245,184,65,.13);border-color:rgba(245,184,65,.5);color:var(--fg);
+  animation:sceneGlow 3s ease-in-out infinite}
+@keyframes sceneGlow{0%,100%{opacity:.96}50%{opacity:1}}
+.scene b{display:block;font-family:'Bricolage Grotesque',sans-serif;font-size:16px;
+  font-weight:700;color:var(--gold);letter-spacing:-.03em;margin-bottom:3px}
+.scene:focus-visible,.ctl:focus-visible{outline:2px solid var(--mint);outline-offset:3px}
+
+.bar{display:flex;align-items:center;gap:16px;padding:16px 22px;border-bottom:1px solid var(--line2)}
+.ctl{width:42px;height:42px;flex:none;border-radius:50%;border:1px solid var(--line);
+  background:var(--glass);color:var(--fg);cursor:pointer;font-size:14px;display:grid;place-items:center;
+  transition:transform .4s var(--spring),background .3s}
+.ctl:hover{background:rgba(255,255,255,.1);transform:scale(1.09)}
+.ctl:active{transform:scale(.94)}
+.ctl.main{background:var(--gold);color:#0A0D16;border-color:transparent;
+  animation:mainGlow 3s ease-in-out infinite}
+@keyframes mainGlow{0%,100%{opacity:.95}50%{opacity:1}}
+.ctl.main:hover{background:#FFC85C}
+.steps{display:flex;gap:6px;flex:1}
+.sdot{flex:1;height:4px;border-radius:99px;background:rgba(255,255,255,.1);cursor:pointer;
+  position:relative;overflow:hidden;transition:background .3s}
+.sdot:hover{background:rgba(255,255,255,.2)}
+.sdot i{position:absolute;inset:0 auto 0 0;width:0;border-radius:99px;background:var(--gold);
+  transition:width .5s var(--exp)}
+.sdot.done i{width:100%;opacity:.55}
+.sdot.now i{width:100%;box-shadow:0 0 14px rgba(245,184,65,.9);animation:nowPulse 2s ease-in-out infinite}
+@keyframes nowPulse{50%{opacity:1}}
+.slabel{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--fg3);
+  min-width:16ch;text-align:right;white-space:nowrap}
+
+.stage{padding:44px;min-height:400px}
+.stageIn{opacity:0;transform:translateY(20px) scale(.985)}
+.stageIn.go{opacity:1;transform:none;transition:opacity .55s var(--exp),transform .65s var(--exp)}
+.st-tag{margin-bottom:16px}
+.st-h{font-family:'Bricolage Grotesque',sans-serif;font-size:clamp(26px,3.4vw,40px);
+  font-weight:700;letter-spacing:-.03em;line-height:1.12;margin-bottom:14px;max-width:20ch}
+.st-b{color:var(--fg2);font-size:15.5px;max-width:62ch;line-height:1.68}
+.st-n{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--fg3);margin-top:18px;line-height:1.6}
+.stag{animation:rise .65s var(--exp) both}
+@keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+
+.meter{margin-top:28px;max-width:400px}
+.mtop{display:flex;justify-content:space-between;font-size:12.5px;color:var(--fg3);margin-bottom:9px}
+.mtop b{color:var(--fg);font-weight:500}
+.mbar{height:8px;border-radius:99px;background:rgba(255,255,255,.09);position:relative}
+.mbar i{display:block;height:100%;width:0;border-radius:99px;
+  background:linear-gradient(90deg,var(--mint),#7BF0C0);
+  box-shadow:0 0 20px rgba(74,222,155,.55);transition:width 1.1s var(--exp)}
+.mbar u{position:absolute;top:-6px;bottom:-6px;width:2px;border-radius:2px;
+  background:var(--coral);text-decoration:none}
+.mfoot{font-size:12px;color:var(--fg3);margin-top:10px}
+
+.chips{display:flex;flex-wrap:wrap;gap:11px;margin-top:28px}
+.chip{border:1px solid var(--line);background:var(--glass);border-radius:15px;padding:15px 17px;
+  max-width:250px;animation:rise .6s var(--exp) both;
+  transition:transform .45s var(--spring),border-color .3s}
+.chip:hover{transform:translateY(-4px);border-color:rgba(255,255,255,.2)}
+.chip b{display:block;font-size:14.5px;font-weight:600;margin-bottom:4px}
+.chip span{color:var(--fg3);font-size:12.5px;line-height:1.45}
+.chip.no{border-style:dashed;opacity:.42}
+.chip.no b{color:var(--coral);text-decoration:line-through}
+
+.ladder{margin-top:26px}
+.rung{display:grid;grid-template-columns:22px 1fr;gap:18px;animation:rise .5s var(--exp) both}
+.spine{position:relative;display:flex;justify-content:center;padding-top:9px}
+.spine::before{content:"";position:absolute;top:0;bottom:0;width:2px;border-radius:2px;
+  background:rgba(255,255,255,.11)}
+.rung:first-child .spine::before{top:9px}
+.rung.last .spine::before{bottom:auto;height:9px}
+.node{width:13px;height:13px;border-radius:50%;z-index:1;position:relative;flex:none;
+  background:var(--mint);box-shadow:0 0 0 2px rgba(74,222,155,.3)}
+.rung.fail .node{background:var(--coral);animation:ping 2.4s ease-out infinite}
+@keyframes ping{0%{transform:scale(1);opacity:1}70%,100%{transform:scale(1.8);opacity:0}}
+.rung.fail .spine::before{background:linear-gradient(rgba(255,255,255,.11) 0 9px,
+  var(--coral) 9px 22px,rgba(255,255,255,.06) 22px)}
+.rung.after .node{background:rgba(255,255,255,.16);box-shadow:none;animation:none}
+.rung.after .spine::before{background:repeating-linear-gradient(to bottom,
+  rgba(255,255,255,.14) 0 3px,transparent 3px 9px)}
+.rb{padding:3px 0 20px}
+.gn{font-size:15px;font-weight:500;display:flex;align-items:center;gap:9px}
+.rung.fail .gn{color:var(--coral)}
+.rung.after .gn{color:var(--fg3)}
+.gd{font-size:12.5px;color:var(--fg3);margin-top:3px}
+.mk{width:19px;height:19px;border-radius:50%;display:grid;place-items:center;font-size:11px;flex:none}
+.mk.y{background:rgba(74,222,155,.16);color:var(--mint)}
+.mk.n{background:rgba(255,111,94,.18);color:var(--coral)}
+
+.callout{margin-top:26px;padding:17px 20px;border-radius:15px;font-size:14.5px;
+  background:rgba(74,222,155,.09);border:1px solid rgba(74,222,155,.26);animation:rise .6s var(--exp) both}
+.callout.no{background:rgba(255,111,94,.09);border-color:rgba(255,111,94,.26)}
+.callout b{font-weight:600}
+
+.eq{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-top:32px}
+.term{animation:rise .55s var(--exp) both;text-align:center}
+.term .tv{font-family:'Bricolage Grotesque',sans-serif;font-size:30px;font-weight:700;letter-spacing:-.035em}
+.term .tk2{font-size:11.5px;color:var(--fg3);margin-top:5px}
+.op{font-size:22px;color:var(--fg3);padding-bottom:26px;font-family:'IBM Plex Mono',monospace}
+.term.res .tv{font-size:40px;color:var(--gold);animation:glowPulse 4s ease-in-out infinite}
+
+.phone{max-width:390px;margin-top:28px;border-radius:20px;padding:20px 22px;
+  background:linear-gradient(165deg,rgba(255,255,255,.08),rgba(255,255,255,.02));
+  border:1px solid var(--line);animation:rise .6s var(--exp) both;
+  box-shadow:0 26px 54px -28px rgba(0,0,0,.9)}
+.ph{display:flex;align-items:center;gap:9px;padding-bottom:13px;
+  border-bottom:1px solid var(--line2);margin-bottom:15px}
+.ph i{width:9px;height:9px;border-radius:50%;background:var(--mint);flex:none;
+  animation:beat 1.9s ease-in-out infinite}
+.pm{font-size:14.5px;line-height:1.75;min-height:4em}
+.caret{display:inline-block;width:8px;height:16px;background:var(--gold);
+  vertical-align:-3px;animation:blink .95s steps(2) infinite;border-radius:1px}
+@keyframes blink{50%{opacity:0}}
+
+.badge{display:inline-flex;align-items:center;gap:15px;border-radius:18px;padding:20px 28px;
+  font-family:'Bricolage Grotesque',sans-serif;font-size:29px;font-weight:700;
+  letter-spacing:-.03em;animation:rise .7s var(--spring) both}
+.badge i{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;
+  font-size:20px;font-style:normal;flex:none}
+.badge.win{background:rgba(74,222,155,.12);border:1px solid rgba(74,222,155,.34);color:var(--mint)}
+.badge.win i{background:rgba(74,222,155,.2);animation:beat 2.2s ease-in-out infinite}
+.badge.loss{background:rgba(255,111,94,.1);border:1px solid rgba(255,111,94,.3);color:var(--coral)}
+.badge.loss i{background:rgba(255,111,94,.18)}
+.badge.neutral{background:var(--glass);border:1px solid var(--line);color:var(--fg2)}
+.badge.neutral i{background:rgba(255,255,255,.1)}
+
+/* ── the cage ── */
+.cagehd{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.cagescore{font-family:'Bricolage Grotesque',sans-serif;font-size:44px;font-weight:800;
+  letter-spacing:-.04em;color:var(--mint);line-height:1}
+.cagesub{font-size:14px;color:var(--fg2)}
+.atk{display:grid;grid-template-columns:1fr;gap:10px}
+.at{display:grid;grid-template-columns:26px 1fr auto;gap:15px;align-items:start;
+  padding:16px 18px;border-radius:14px;background:var(--glass);border:1px solid var(--line2);
+  transition:transform .45s var(--exp),border-color .3s}
+.at:hover{transform:translateX(4px);border-color:var(--line)}
+.at.ok{border-left:2px solid var(--mint)}
+.at.no{border-left:2px solid var(--coral)}
+.at .ai{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:11px}
+.at.ok .ai{background:rgba(74,222,155,.16);color:var(--mint)}
+.at.no .ai{background:rgba(255,111,94,.18);color:var(--coral)}
+.at .an{font-size:14px;font-weight:600}
+.at .aq{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--fg2);
+  margin-top:7px;line-height:1.6;padding-left:11px;border-left:2px solid var(--line)}
+.at .ar{font-size:12px;color:var(--coral);margin-top:8px}
+.at .aw{font-size:12.5px;color:var(--fg3);margin-top:6px;line-height:1.5}
+.at .av{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.12em;
+  text-transform:uppercase;white-space:nowrap}
+.at.ok .av{color:var(--mint)} .at.no .av{color:var(--coral)}
+.ceil{margin-top:16px;padding:18px 20px;border-radius:15px;background:var(--glass);
+  border:1px solid var(--line2);display:flex;gap:32px;align-items:center;flex-wrap:wrap}
+.ceil div span{display:block;font-family:'Bricolage Grotesque',sans-serif;font-size:28px;
+  font-weight:700;letter-spacing:-.03em}
+.ceil div small{font-size:12px;color:var(--fg3)}
+.ceil .c1 span{color:var(--mint)} .ceil .c2 span{color:var(--gold)}
+.ceil p{margin:0;font-size:13px;color:var(--fg2);flex:1;min-width:260px;line-height:1.55}
+
+/* ── can you trust the diagnosis ── */
+.tgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px}
+.tsl{padding:22px;border-radius:16px;background:var(--glass);border:1px solid var(--line2)}
+.tsl.bad{border-color:rgba(255,111,94,.32);background:rgba(255,111,94,.05)}
+.tsl.mid{border-color:rgba(245,184,65,.28);background:rgba(245,184,65,.045)}
+.tsl .tv{font-family:'Bricolage Grotesque',sans-serif;font-size:38px;font-weight:800;
+  letter-spacing:-.04em;line-height:1}
+.tsl.good .tv{color:var(--mint)} .tsl.mid .tv{color:var(--gold)} .tsl.bad .tv{color:var(--coral)}
+.tsl .tl{font-size:14px;font-weight:600;margin-top:8px}
+.tsl .tn{font-size:12.5px;color:var(--fg3);margin-top:8px;line-height:1.5}
+.tsl .tm{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--fg3);margin-top:12px;
+  padding-top:10px;border-top:1px solid var(--line2)}
+.funnel{padding:24px;border-radius:16px;background:var(--glass);border:1px solid var(--line2)}
+.fstep{display:grid;grid-template-columns:64px 1fr;gap:16px;align-items:center;padding:11px 0;
+  border-bottom:1px solid var(--line2)}
+.fstep:last-child{border-bottom:0}
+.fstep .fn{font-family:'Bricolage Grotesque',sans-serif;font-size:24px;font-weight:700;
+  letter-spacing:-.03em;text-align:right}
+.fstep .ft{font-size:14px} .fstep .fd{font-size:12.5px;color:var(--fg3);margin-top:2px}
+.fstep.danger .fn{color:var(--coral)} .fstep.safe .fn{color:var(--mint)}
+@media(max-width:940px){.tgrid{grid-template-columns:1fr}}
+.cols{display:grid;grid-template-columns:1.08fr 1fr;gap:22px;align-items:start}
+.panel{margin-bottom:22px}
+.phead{padding:20px 24px;border-bottom:1px solid var(--line2);
+  display:flex;justify-content:space-between;align-items:baseline;gap:14px}
+.phead h3{font-size:18px}
+.hint{font-size:12px;color:var(--fg3)}
+.pbody{padding:10px 24px 22px}
+.crow{padding:16px 0;border-bottom:1px solid var(--line2);
+  display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center}
+.crow:last-child{border-bottom:0}
+.cname{font-size:15px;font-weight:500}
+.cmeta{font-size:12.5px;color:var(--fg3);margin-top:3px}
+.cright{text-align:right;min-width:112px}
+.clift{font-family:'Bricolage Grotesque',sans-serif;font-size:20px;font-weight:700;
+  letter-spacing:-.03em;color:var(--mint)}
+.clift.z{color:var(--fg3)}
+.bars{margin-top:7px;display:flex;flex-direction:column;gap:4px}
+.bb{height:5px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden}
+.bb i{display:block;height:100%;width:0;border-radius:99px;transition:width 1.2s var(--exp)}
+.bb.t i{background:var(--gold)} .bb.c i{background:rgba(255,255,255,.32)}
+
+.stream{max-height:456px;overflow-y:auto}
+.stream::-webkit-scrollbar{width:8px}
+.stream::-webkit-scrollbar-thumb{background:rgba(255,255,255,.13);border-radius:99px}
+.drow{display:grid;grid-template-columns:auto 1fr auto;gap:15px;align-items:center;
+  padding:14px 24px;cursor:pointer;border-bottom:1px solid var(--line2);
+  transition:background .25s,padding-left .35s var(--exp)}
+.drow:hover{background:rgba(255,255,255,.045);padding-left:29px}
+.damt{font-family:'Bricolage Grotesque',sans-serif;font-size:16px;font-weight:700;
+  color:var(--gold);letter-spacing:-.03em;min-width:82px}
+.dwho{font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dwho span{color:var(--fg3);font-size:12.5px}
+.dout{font-size:12px;padding:5px 11px;border-radius:99px;white-space:nowrap}
+.dout.win{background:rgba(74,222,155,.13);color:var(--mint)}
+.dout.loss{background:rgba(255,111,94,.11);color:var(--coral)}
+.dout.neutral{background:rgba(255,255,255,.07);color:var(--fg3)}
+
+.kv{display:flex;justify-content:space-between;gap:16px;padding:13px 0;
+  border-bottom:1px solid var(--line2);font-size:14px}
+.kv:last-child{border-bottom:0}
+.kv span:last-child{color:var(--fg3);font-size:13px;white-space:nowrap}
+.kv b{color:var(--coral);font-weight:600;font-family:'Bricolage Grotesque',sans-serif;font-size:16px}
+
+footer{margin-top:70px;padding-top:26px;border-top:1px solid var(--line2);
+  display:flex;justify-content:space-between;gap:22px;flex-wrap:wrap;font-size:13px;color:var(--fg3)}
+
+@media(max-width:940px){
+  .wrap{padding:28px 18px 80px}
+  .cols{grid-template-columns:1fr}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .legend{grid-template-columns:1fr}
+  .stage{padding:30px 22px;min-height:0}
+  .sec{margin-bottom:64px}
+  .slabel{display:none}
+}
+/* every ambient loop stops for anyone who asked for that */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition-duration:.001ms!important}
+  .rv,.stageIn{opacity:1!important;transform:none!important}
+  .aurora,.grain{display:none}
+}
+</style>
+</head>
+<body>
+<div class="aurora" aria-hidden="true"><i class="a1"></i><i class="a2"></i><i class="a3"></i></div>
+
+
+<div class="wrap">
+
+<header class="rv in">
+  <div class="logo"><div class="dot"></div>
+    <div class="wordmark">Recoup <span>/ recovery control tower</span></div></div>
+  <div class="pills" id="pills"></div>
+</header>
+
+<div class="ticker rv in" aria-hidden="true"><div class="tk-track" id="tkTrack"></div></div>
+
+<section class="hero rv">
+  <div class="kicker tag">Razorpay AI Buildathon · Track 03</div>
+  <h1 class="headline"><span class="num" id="hn">—</span> was slipping away.
+    <span class="s">We got <span class="g num" id="hg">—</span> of it back, and we can prove
+      which part was actually ours.</span></h1>
+  <div class="card flowcard">
+    <svg id="flow" viewBox="0 0 960 250" role="img" aria-label="Where the at-risk money went"></svg>
+    <div class="legend" id="legend"></div>
+  </div>
+</section>
+
+<section class="stats rv" id="stats"></section>
+
+<section class="sec rv">
+  <div class="shead"><h2>Watch it think</h2>
+    <p>One payment, one decision, every step it took to get there. Pick a scenario
+       and press play — or click any step to jump.</p></div>
+  <div class="card theatre">
+    <div class="scenes" id="scenes"></div>
+    <div class="bar">
+      <button class="ctl main" id="play" aria-label="Play">▶</button>
+      <button class="ctl" id="prev" aria-label="Previous step">‹</button>
+      <button class="ctl" id="next" aria-label="Next step">›</button>
+      <div class="steps" id="steps"></div>
+      <div class="slabel" id="slabel">—</div>
+    </div>
+    <div class="stage" id="stage"></div>
+  </div>
+</section>
+
+<section class="sec rv">
+  <div class="shead"><h2>Where the AI is, and what stops it</h2>
+    <p>A language model handles the cases rules can't read, and writes the customer
+       message. It is never trusted. Every output crosses a validator first — here
+       is that validator being attacked with the things models actually get wrong.</p></div>
+  <div class="cagehd"><div class="cagescore" id="cagescore">—</div>
+    <div class="cagesub" id="cagesub">running the suite…</div></div>
+  <div class="atk" id="cagelist"></div>
+  <div class="ceil" id="cageceil"></div>
+</section>
+
+<section class="sec rv">
+  <div class="shead"><h2>Can you trust the diagnosis?</h2>
+    <p>Every number above depends on getting the cause right. So the classifier is
+       scored against ground truth it never sees — including the 14% of cases where
+       the gateway reports the wrong code on purpose.</p></div>
+  <div class="tgrid" id="tslices"></div>
+  <div class="funnel" id="tfunnel"></div>
+</section>
+
+<section class="sec rv">
+  <div class="shead"><h2>The whole book</h2>
+    <p>Every failure we saw, what we did about it, and what it was worth.</p></div>
+  <div class="cols">
+    <div>
+      <div class="card panel">
+        <div class="phead"><h3>Why the money leaks</h3>
+          <span class="hint">gold = we acted · white = left alone</span></div>
+        <div class="pbody" id="causes"></div>
+      </div>
+      <div class="card panel">
+        <div class="phead"><h3>Things we refused to do</h3><span class="hint">this batch</span></div>
+        <div class="pbody" id="gates"></div>
+      </div>
+    </div>
+    <div>
+      <div class="card panel">
+        <div class="phead"><h3>Every decision</h3><span class="hint">click to walk through</span></div>
+        <div class="stream" id="streamlist"></div>
+      </div>
+      <div class="card panel">
+        <div class="phead"><h3>Couldn't solve</h3><span class="hint" id="excrate"></span></div>
+        <div class="pbody" id="exceptions"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <span id="footL">—</span>
+  <span>Nothing here counts money a customer would have paid us anyway.</span>
+</footer>
+</div>
+
+<script>
+const R="\u20b9",$=id=>document.getElementById(id);
+const RM=matchMedia("(prefers-reduced-motion: reduce)").matches;
+const money=n=>R+Math.round(n).toLocaleString("en-IN");
+const short=n=>n>=1e7?R+(n/1e7).toFixed(2)+"Cr":n>=1e5?R+(n/1e5).toFixed(2)+"L":n>=1e3?R+(n/1e3).toFixed(1)+"k":money(n);
+const pct=n=>(n*100).toFixed(0)+"%";
+const STAGES=["The failure","What went wrong","What we could do",
+              "What we're allowed to do","Is it worth it","What we sent","What happened"];
+let SUM=null,PICKS=[],STORY=null,IDX=0,TIMER=null;
+
+const io=new IntersectionObserver(es=>es.forEach(e=>{
+  if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target);}
+}),{threshold:.08});
+
+function countUp(el,to,fmt,ms=1500){
+  if(RM){el.textContent=fmt(to);return;}
+  const t0=performance.now();
+  (function tick(t){
+    const k=Math.min(1,(t-t0)/ms),e=1-Math.pow(1-k,4);
+    el.textContent=fmt(to*e);
+    if(k<1)requestAnimationFrame(tick);
+  })(t0);
+}
+
+function drawFlow(flow){
+  const W=960,H=250,SX=8,SW=13,TX=880,TW=13,PAD=10;
+  const col={ours:"#F5B841",organic:"rgba(255,255,255,.42)",lost:"#FF6F5E"};
+  const st=flow.streams,tot=st.reduce((a,b)=>a+b.share,0)||1;
+  const usable=H-PAD*2,gap=20,th=st.map(s=>Math.max(16,(s.share/tot)*(usable-gap*2)));
+  let sy=PAD,ty=PAD,defs="",rib="",caps="",parts="";
+
+  st.forEach((s,i)=>{
+    const sh=Math.max(4,(s.share/tot)*usable),s0=sy,s1=sy+sh;sy=s1;
+    const t0=ty,t1=ty+th[i];ty=t1+gap;
+    const mx=(SX+SW+TX)/2;
+    defs+=`<linearGradient id="g${i}" x1="0" x2="1">
+      <stop offset="0" stop-color="${col[s.key]}" stop-opacity="${s.key==='ours'?.20:.10}"/>
+      <stop offset="1" stop-color="${col[s.key]}" stop-opacity="${s.key==='ours'?.55:.26}"/></linearGradient>`;
+    rib+=`<path d="M${SX+SW},${s0} C${mx},${s0} ${mx},${t0} ${TX},${t0}
+      L${TX},${t1} C${mx},${t1} ${mx},${s1} ${SX+SW},${s1} Z" fill="url(#g${i})"/>`;
+    const c0=(s0+s1)/2,c1=(t0+t1)/2;
+    defs+=`<path id="ln${i}" d="M${SX+SW},${c0} C${mx},${c0} ${mx},${c1} ${TX},${c1}" fill="none"/>`;
+    if(!RM)for(let k=0;k<7;k++){
+      const d=4.6+i*.7;
+      parts+=`<circle r="${s.key==='ours'?2.7:2}" fill="${col[s.key]}" opacity=".9">
+        <animateMotion dur="${d}s" begin="${1.2+k*d/7}s" repeatCount="indefinite">
+        <mpath href="#ln${i}"/></animateMotion></circle>`;
+    }
+    caps+=`<rect x="${TX}" y="${t0}" width="${TW}" height="${t1-t0}" rx="6.5"
+      fill="${col[s.key]}" opacity="${s.key==='ours'?1:.62}"
+      ${s.key==='ours'?'filter="url(#glow)"':''}/>`;
+  });
+
+  $("flow").innerHTML=`<defs>${defs}
+    <filter id="glow" x="-90%" y="-90%" width="280%" height="280%">
+      <feGaussianBlur stdDeviation="7" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <clipPath id="rv"><rect id="rvr" x="0" y="0" width="0" height="${H}"/></clipPath></defs>
+    <rect x="${SX}" y="${PAD}" width="${SW}" height="${H-PAD*2}" rx="6.5" fill="rgba(255,255,255,.20)"/>
+    <g clip-path="url(#rv)">${rib}${caps}${parts}</g>`;
+
+  const r=$("rvr");
+  if(RM){r.setAttribute("width",W);return;}
+  const t0=performance.now();
+  (function grow(t){
+    const k=Math.min(1,(t-t0)/1600),e=1-Math.pow(1-k,4);
+    r.setAttribute("width",W*e);
+    if(k<1)requestAnimationFrame(grow);
+  })(t0);
+}
+
+async function boot(){
+  SUM=await(await fetch("/api/summary")).json();
+  const s=SUM,p=s.provenance;
+
+  $("pills").innerHTML=[
+    `<b>${s.cohort_size}</b> payments`,
+    `<b>${short(s.at_risk)}</b> on the line`,
+    `<b>${s.control.n}</b> left untouched`,
+    `gateway <b>${p.gateway_mode}</b>`,
+  ].map(x=>`<div class="pill">${x}</div>`).join("")
+   +`<div class="pill live"><i></i>live</div>`;
+
+  countUp($("hn"),s.at_risk,short,1600);
+  setTimeout(()=>countUp($("hg"),s.incremental,short,1800),380);
+
+  drawFlow(s.flow);
+  $("legend").innerHTML=s.flow.streams.map(x=>
+    `<div class="leg k-${x.key}"><i class="sw"></i>
+      <div class="lv num">${money(x.value)}</div>
+      <div class="lk">${x.label}</div><div class="ln">${x.note}</div></div>`).join("");
+
+  $("stats").innerHTML=[
+    ["What it cost us",money(s.spend)],
+    ["Kept, after costs",money(s.net)],
+    ["Back per rupee spent",R+s.roi.toFixed(0)],
+    ["Paid after we acted",pct(s.treatment.recovery_rate)],
+    ["Paid with no help",pct(s.control.recovery_rate)],
+  ].map(([k,v])=>`<div class="stat"><div class="sv num">${v}</div><div class="sk">${k}</div></div>`).join("");
+
+  const rows=Object.entries(s.by_cause).sort((a,b)=>b[1].at_risk-a[1].at_risk);
+  $("causes").innerHTML=rows.map(([k,b])=>`<div class="crow">
+    <div><div class="cname">${b.label}</div>
+      <div class="cmeta">${b.n} payments · ${money(b.at_risk)} on the line</div></div>
+    <div class="cright">
+      <div class="clift ${b.lift_pp==null||Math.abs(b.lift_pp)<.5?"z":""}">${
+        b.lift_pp==null?"—":(b.lift_pp>=0?"+":"")+b.lift_pp.toFixed(0)+"pp"}</div>
+      <div class="bars">
+        <div class="bb t"><i data-w="${(b.rate*100).toFixed(0)}"></i></div>
+        <div class="bb c"><i data-w="${b.control_rate==null?0:(b.control_rate*100).toFixed(0)}"></i></div>
+      </div></div></div>`).join("");
+  setTimeout(()=>document.querySelectorAll(".bb i").forEach(
+    (i,n)=>setTimeout(()=>i.style.width=i.dataset.w+"%",n*55)),700);
+
+  $("gates").innerHTML=s.gate_blocks.length
+    ? s.gate_blocks.slice(0,8).map(g=>
+        `<div class="kv"><span>${g.label}</span><b>${g.n}\u00d7</b></div>`).join("")
+    : `<div class="hint">Nothing was blocked this batch.</div>`;
+
+  $("excrate").textContent=pct(s.exception_rate)+" of what we worked";
+  $("exceptions").innerHTML=s.exceptions.slice(0,6).map(e=>
+    `<div class="kv"><span>${e.label}</span>
+     <span>${money(e.amount)} · ${e.outcome_label.toLowerCase()}</span></div>`).join("");
+
+  $("footL").textContent=`No messages ${s.guardrails.quiet_hours} · max `+
+    `${s.guardrails.max_touches_per_customer_7d} per person per week · `+
+    `${s.guardrails.cooldown_hours}h between messages`;
+
+  const d=await(await fetch("/api/decisions?limit=200")).json();
+  const seen=new Set(),uq=[];
+  for(const r of d)if(!seen.has(r.event_id)){seen.add(r.event_id);uq.push(r);}
+
+  const tk=uq.slice(0,26).map(r=>
+    `<div class="tk"><s class="${r.tone}"></s><b>${money(r.amount_rupees)}</b>
+      ${r.cause_label} <em>\u2192 ${r.action_label.toLowerCase()}</em></div>`).join("");
+  $("tkTrack").innerHTML=tk+tk;
+
+  $("streamlist").innerHTML=uq.slice(0,90).map(r=>
+    `<div class="drow" data-id="${r.event_id}">
+      <div class="damt num">${money(r.amount_rupees)}</div>
+      <div class="dwho">${r.cause_label}<br><span>${r.action_label}</span></div>
+      <div class="dout ${r.tone}">${r.outcome_label}</div></div>`).join("");
+  document.querySelectorAll(".drow").forEach(el=>el.addEventListener("click",()=>{
+    load(el.dataset.id);
+    document.querySelector(".theatre").scrollIntoView({block:"center"});
+  }));
+
+  fetch("/api/cage").then(r=>r.json()).then(c=>{
+    $("cagescore").textContent=c.passed+"/"+c.total;
+    $("cagesub").innerHTML=`checks behaved correctly ·
+      <b style="color:var(--coral)">${c.refused} attacks refused</b>,
+      recomputed live against the same validators the engine uses`;
+
+    const copy=c.copy.map(r=>
+      `<div class="at ${r.sent?"ok":"no"}">
+        <div class="ai">${r.sent?"✓":"✕"}</div>
+        <div><div class="an">The model wrote: ${r.label}</div>
+          <div class="aq">${r.text}</div>
+          ${r.reason?`<div class="ar">Refused — ${r.reason}</div>`:""}
+          <div class="aw">${r.why}</div></div>
+        <div class="av">${r.sent?"sent":"refused"}</div></div>`).join("");
+
+    const acts=c.actions.map(r=>
+      `<div class="at ${r.allowed?"ok":"no"}">
+        <div class="ai">${r.allowed?"✓":"✕"}</div>
+        <div><div class="an">The model suggested: ${r.proposed}</div>
+          <div class="aq">for &ldquo;${r.cause}&rdquo;</div>
+          ${r.reason?`<div class="ar">Refused — ${r.reason}</div>`:""}
+          <div class="aw">${r.why}</div></div>
+        <div class="av">${r.allowed?"allowed":"refused"}</div></div>`).join("");
+
+    $("cagelist").innerHTML=copy+acts;
+    $("cageceil").innerHTML=
+      `<div class="c1"><span>${c.rule_confidence.toFixed(2)}</span><small>a rule that matches</small></div>
+       <div class="c2"><span>${c.ceiling.toFixed(2)}</span><small>ceiling on any model output</small></div>
+       <p>The model is capped below what a deterministic match earns, so a confident
+          hallucination can never outrank a rule or clear a gate a rule would have
+          failed. Certainty has to be earned by evidence, not asserted by the thing
+          being evaluated.</p>`;
+  }).catch(()=>{});
+
+  fetch("/api/trust").then(r=>r.json()).then(t=>{
+    const tone={clean:"good",degraded:"mid",confused:"bad"};
+    $("tslices").innerHTML=t.slices.map(x=>
+      `<div class="tsl ${tone[x.key]}">
+        <div class="tv num">${pct(x.accuracy)}</div>
+        <div class="tl">${x.label}</div>
+        <div class="tn">${x.note}</div>
+        <div class="tm">${x.n} events · acted on ${pct(x.acted)}</div>
+      </div>`).join("");
+
+    const e=t.errors;
+    $("tfunnel").innerHTML=[
+      [t.n,"Payments diagnosed",`Overall accuracy ${pct(t.accuracy)}.`,""],
+      [e.n,"We got the cause wrong",
+       `${pct(e.share)} of the book. Almost all of it is the slice where the gateway lied.`,""],
+      [e.caught_n,"Caught before we acted",
+       `${pct(e.caught_share)} of our mistakes. Confidence fell below ${t.floor} and a human took it.`,"safe"],
+      [e.acted_n,"Slipped through and we acted",
+       "Wrong playbook, real customer. This is the honest cost.",""],
+      [e.dangerous_n,"Acted on a hard-stop cause",
+       `${pct(e.dangerous_share)} of the book · ${money(e.dangerous_rupees)} exposed. A dead card or
+        risk decline misread as something worth chasing — the number that would get a
+        payments team in trouble, so it's reported rather than buried.`,"danger"],
+    ].map(([n,ttl,d,cls])=>
+      `<div class="fstep ${cls}"><div class="fn num">${n}</div>
+        <div><div class="ft">${ttl}</div><div class="fd">${d}</div></div></div>`).join("");
+  }).catch(()=>{});
+
+  PICKS=await(await fetch("/api/showcase")).json();
+  $("scenes").innerHTML=PICKS.map((p,i)=>
+    `<button class="scene${i?"":" on"}" data-id="${p.event_id}">
+      <b>${money(p.amount)}</b>${p.hook}</button>`).join("");
+  document.querySelectorAll(".scene").forEach(b=>b.addEventListener("click",()=>{
+    document.querySelectorAll(".scene").forEach(x=>x.classList.remove("on"));
+    b.classList.add("on");load(b.dataset.id);
+  }));
+  $("steps").innerHTML=STAGES.map((_,i)=>`<div class="sdot" data-i="${i}"><i></i></div>`).join("");
+  document.querySelectorAll(".sdot").forEach(dd=>dd.addEventListener("click",()=>{
+    stop();IDX=+dd.dataset.i;render();}));
+
+  // removed pointer tracking for perf
+
+  document.querySelectorAll(".rv").forEach(el=>io.observe(el));
+
+  if(PICKS.length){
+    await load(PICKS[0].event_id);
+    if(!RM)setTimeout(()=>{if(!TIMER)$("play").click();},1900);
+  }
+}
+
+async function load(id){
+  stop();
+  STORY=await(await fetch("/api/story/"+id)).json();
+  IDX=0;render();
+}
+
+function render(){
+  const s=STORY;if(!s||s.error)return;
+  $("slabel").textContent=`${IDX+1} of 7 · ${STAGES[IDX]}`;
+  document.querySelectorAll(".sdot").forEach((d,i)=>{
+    d.classList.toggle("done",i<IDX);d.classList.toggle("now",i===IDX);});
+  $("stage").innerHTML=`<div class="stageIn" id="si">${[f0,f1,f2,f3,f4,f5,f6][IDX](s)}</div>`;
+  requestAnimationFrame(()=>{const el=$("si");if(el)el.classList.add("go");});
+  if(IDX===1)setTimeout(()=>{const m=$("mfill");if(m)m.style.width=pct(s.diagnosis.confidence);},260);
+  if(IDX===3)revealGates(s);
+  if(IDX===5)typeMsg(s);
+}
+
+const f0=s=>`<div class="tag st-tag">A payment just failed</div>
+  <div class="st-h stag"><span class="num">${money(s.amount)}</span> didn't go through.</div>
+  <div class="st-b stag" style="animation-delay:.1s">The gateway handed us one string:
+    <b style="color:var(--fg)">${s.failure.reason.replace(/_/g," ")}</b>, on attempt
+    ${s.failure.attempt}. That's all we get. Everything after this is working out what it
+    actually means, and whether to do anything at all about it.</div>`;
+
+const f1=s=>`<div class="tag st-tag">What went wrong</div>
+  <div class="st-h stag">${s.diagnosis.label}.</div>
+  <div class="st-b stag" style="animation-delay:.1s">${s.diagnosis.oneline}</div>
+  <div class="meter stag" style="animation-delay:.2s">
+    <div class="mtop"><span>How sure we are</span>
+      <b>${pct(s.diagnosis.confidence)} · ${s.diagnosis.by==="llm"?"AI model":"a rule"}</b></div>
+    <div class="mbar"><i id="mfill"></i><u style="left:55%"></u></div>
+    <div class="mfoot">The red mark is our floor. Below it we don't act — a person does.</div></div>
+  <div class="st-n stag" style="animation-delay:.3s">${s.diagnosis.rationale}</div>`;
+
+const f2=s=>`<div class="tag st-tag">What we could do</div>
+  <div class="st-h stag">${s.playbook.retry_forbidden
+    ?"Trying again is off the table here.":"Everything this situation allows."}</div>
+  <div class="st-b stag" style="animation-delay:.1s">${s.playbook.explanation}</div>
+  <div class="chips">${s.playbook.candidates.map((c,i)=>
+    `<div class="chip" style="animation-delay:${.2+i*.09}s"><b>${c.label}</b>
+      <span>${c.why}</span></div>`).join("")}
+    ${s.playbook.retry_forbidden?`<div class="chip no" style="animation-delay:.5s">
+      <b>Try again</b><span>Ruled out for this cause. It would fail every single time.</span></div>`:""}</div>`;
+
+const f3=s=>{
+  const L=s.ladder,handoff=L.blocked&&L.action==="ESCALATE_HUMAN";
+  return `<div class="tag st-tag">What we're allowed to do</div>
+  <div class="st-h stag">${handoff?"Every automated option is off the table."
+    :L.blocked?`We wanted to ${L.label.toLowerCase()}. A rule stopped us.`
+    :`Every check ${L.label.toLowerCase()} had to pass.`}</div>
+  <div class="st-b stag" style="animation-delay:.1s">These run
+    <b style="color:var(--fg)">before</b> we work out whether it's worth money.
+    No amount, and no AI model, can skip one.</div>
+  <div class="ladder" id="ladder"></div>
+  ${L.fell_back_to?`<div class="callout no" style="animation-delay:.7s">Blocked — so we fell
+    back to <b>${L.fell_back_to.toLowerCase()}</b> instead.</div>`:""}
+  ${handoff?`<div class="callout no" style="animation-delay:.7s">A person picks this up.
+    An agent that retries around a risk decline is an agent laundering a decline.</div>`:""}`;
+};
+
+function revealGates(s){
+  const L=$("ladder");if(!L)return;
+  const gs=s.ladder.gates;let failed=false;
+  L.innerHTML=gs.map((g,i)=>{
+    const cls=!g.passed?"fail":(failed?"after":"");
+    if(!g.passed)failed=true;
+    return `<div class="rung ${cls} ${i===gs.length-1?"last":""}"
+      style="animation-delay:${RM?0:.2+i*.11}s">
+      <div class="spine"><div class="node" style="animation-delay:${i*.28}s"></div></div>
+      <div class="rb"><div class="gn"><span class="mk ${g.passed?"y":"n"}">${
+        g.passed?"\u2713":"\u2715"}</span>${g.label}</div>
+        <div class="gd">${g.detail}</div></div></div>`;
+  }).join("");
+}
+
+const f4=s=>{
+  const m=s.maths,ok=m.ev>=m.threshold;
+  return `<div class="tag st-tag">Is it worth it</div>
+  <div class="st-h stag">${ok?`Yes — by ${money(m.ev)}.`:"No. We leave this one alone."}</div>
+  <div class="st-b stag" style="animation-delay:.1s">Chance it works, times what we'd get back,
+    minus what it costs to send and minus the goodwill we spend on the customer.
+    Annoying someone has a price here too.</div>
+  <div class="eq">
+    ${[[pct(m.p||0),"might work",0],[money(m.amount),"at stake",1],
+       [money(m.cost),"to send",2],[money(m.goodwill),"goodwill",3]]
+      .map(([v,k,i])=>`${i?`<div class="op">${i===1?"\u00d7":"\u2212"}</div>`:""}
+        <div class="term" style="animation-delay:${.2+i*.12}s">
+        <div class="tv num">${v}</div><div class="tk2">${k}</div></div>`).join("")}
+    <div class="op">=</div>
+    <div class="term res" style="animation-delay:.7s">
+      <div class="tv num">${money(m.ev)}</div><div class="tk2">worth chasing</div></div></div>
+  <div class="callout ${ok?"":"no"}" style="animation-delay:.85s">${ok
+    ?`Clears our floor of ${money(m.threshold)}, so we act.`
+    :`Under our floor of ${money(m.threshold)}. Chasing it costs more than it brings back.`}</div>`;
+};
+
+const f5=s=>`<div class="tag st-tag">What we sent</div>
+  <div class="st-h stag">${s.action.label}.</div>
+  <div class="st-b stag" style="animation-delay:.1s">${s.action.why}${
+    s.action.notes?" — "+s.action.notes:""}</div>
+  ${s.action.copy?`<div class="phone" style="animation-delay:.25s">
+    <div class="ph"><i></i><span class="tag">WhatsApp · to the customer</span></div>
+    <div class="pm" id="pm"></div></div>
+  <div class="st-n stag" style="animation-delay:.4s">Written by ${
+    s.action.copy_source==="llm"?"the AI model, then checked before sending"
+    :"a safe template — the model's version failed our checks"}. No threats,
+    no invented amounts, opt-out always included.</div>`
+  :`<div class="st-n stag" style="animation-delay:.2s">Nothing was sent to the customer.${
+    s.action.gateway?" Gateway: "+s.action.gateway+".":""}</div>`}`;
+
+function typeMsg(s){
+  const el=$("pm");if(!el||!s.action.copy)return;
+  const txt=s.action.copy;
+  if(RM){el.textContent=txt;return;}
+  let i=0;
+  setTimeout(function step(){
+    const e2=$("pm");if(!e2)return;
+    e2.innerHTML=txt.slice(0,i)+'<span class="caret"></span>';
+    if(i++<txt.length)setTimeout(step,14);else e2.textContent=txt;
+  },420);
+}
+
+const f6=s=>{
+  const o=s.outcome,ic=o.tone==="win"?"\u2713":o.tone==="loss"?"\u2715":"\u2192";
+  const say={
+    recovered:"We got the money back — and because this customer sat in the group we acted on, we can count it. But only after subtracting what the untouched group recovered on its own.",
+    recovered_organic:"They paid without us. Real money, but not our win, so we don't claim it.",
+    escalated_to_human:"A person picks this up. Some decisions shouldn't be automated, and a risk decline is top of that list.",
+    no_action_taken:"We deliberately did nothing. Not every rupee is worth chasing, and pretending otherwise is how customers end up spammed.",
+  }[o.raw]||"It didn't work. It stays in the denominator of every number on this page.";
+  return `<div class="tag st-tag">What happened</div>
+  <div class="badge ${o.tone}"><i>${ic}</i>${o.label}${
+    o.recovered>0?" \u00b7 "+money(o.recovered):""}</div>
+  <div class="st-b stag" style="margin-top:26px;animation-delay:.2s">${say}</div>
+  <div class="st-n stag" style="animation-delay:.35s">Every step you just watched is in the
+    audit log — including the checks that passed.</div>`;
+};
+
+function stop(){clearInterval(TIMER);TIMER=null;$("play").textContent="\u25b6";}
+$("play").onclick=()=>{
+  if(TIMER){stop();return;}
+  if(IDX>=6)IDX=0;
+  render();$("play").textContent="\u2016";
+  TIMER=setInterval(()=>{if(IDX>=6){stop();return;}IDX++;render();},4200);
+};
+$("next").onclick=()=>{stop();IDX=Math.min(6,IDX+1);render();};
+$("prev").onclick=()=>{stop();IDX=Math.max(0,IDX-1);render();};
+addEventListener("keydown",e=>{
+  if(e.key==="ArrowRight"){stop();IDX=Math.min(6,IDX+1);render();}
+  if(e.key==="ArrowLeft"){stop();IDX=Math.max(0,IDX-1);render();}
+});
+
+boot().catch(e=>{$("pills").innerHTML=`<div class="pill">Couldn't load: ${e.message}</div>`;});
+</script>
+</body>
+</html>
