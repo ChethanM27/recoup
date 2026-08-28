@@ -34,9 +34,10 @@ from recoup import language as lang
 
 BAR = "=" * 78
 AMOUNT = 1847.00
+CHECKMARK = chr(10003)
+CROSSMARK = chr(10007)
+BULLET = chr(183)
 
-# ── message copy the model might produce, and what should happen ────────────
-# (label, what the model wrote, must_pass, why it matters)
 COPY_CASES = [
     ("clean message",
      "Hi! Your payment of Rs 1847 didn't go through. You can complete it here: "
@@ -99,8 +100,6 @@ COPY_CASES = [
      "models do return blank completions; something must be sendable"),
 ]
 
-# ── actions the model might propose, per root cause ─────────────────────────
-# (label, cause, proposed action, must_pass, why)
 ACTION_CASES = [
     ("sensible suggestion", RootCause.AUTH_FRICTION, "SWITCH_RAIL_UPI", True,
      "in the playbook - proceeds, and still faces every gate"),
@@ -135,7 +134,7 @@ def run_copy(verbose):
         ok, result = validate_copy(text, AMOUNT)
         correct = (ok == must_pass)
         passed += correct
-        mark = "\u2713" if correct else "\u2717 BUG"
+        mark = CHECKMARK if correct else CROSSMARK + " BUG"
         verdict = "sent" if ok else "refused"
         print(f"    {label:<26}{verdict:>10}   {mark}")
         if not ok and verbose:
@@ -155,7 +154,7 @@ def run_actions(verbose):
         ok = action is not None
         correct = (ok == must_pass)
         passed += correct
-        mark = "\u2713" if correct else "\u2717 BUG"
+        mark = CHECKMARK if correct else CROSSMARK + " BUG"
         verdict = "allowed" if ok else "refused"
         print(f"    {label:<26}{verdict:>10}   {mark}")
         if verbose:
@@ -178,7 +177,7 @@ def run_confidence():
     print(f"    a rule that matches a known code       0.97")
     print(f"    the ceiling any model output is capped to  {LLM_CONFIDENCE_CEILING:.2f}")
     ok = LLM_CONFIDENCE_CEILING < 0.97
-    result = f"{'NO ' + chr(10003) if ok else 'YES - BUG ' + chr(10007)}"
+    result = "NO " + CHECKMARK if ok else "YES - BUG " + CROSSMARK
     print(f"\n    model can outrank a rule?              {result}")
     print("      A model claiming 0.99 gets clamped. Certainty has to be earned")
     print("      by evidence, not asserted by the thing being evaluated.")
@@ -199,11 +198,11 @@ def run_taxonomy():
     forbidden = [c.value for c, pb in PLAYBOOKS.items() if pb.retry_forbidden]
     print(f"    causes where retry is forbidden outright: {len(forbidden)}")
     for c in forbidden:
-        print(f"      \u00b7 {lang.cause_name(c)}")
-    print(f"\n    playbooks that contradict themselves:    "
-          f"{len(bad) if bad else '0  ' + chr(10003)}"
+        print(f"      {BULLET} {lang.cause_name(c)}")
+    bad_count = len(bad) if bad else ("0  " + CHECKMARK)
+    print(f"\n    playbooks that contradict themselves:    {bad_count}")
     for b in bad:
-        print(f"      \u2717 {b}")
+        print(f"      {CROSSMARK} {b}")
     return (1 if not bad else 0), 1
 
 
